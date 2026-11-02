@@ -1,20 +1,24 @@
-# Configuração do Streamlit. Descomente e ajuste conforme o projeto avançar.
-# O tema pode ser trocado pelo menu ⋮ → Settings → Choose app theme.
+# Tema baseado na paleta da EDA (rosa = Normal, roxo = Cardíaco).
+# O modo claro/escuro pode ser trocado pelo menu ⋮ → Settings.
 
 [theme]
-paddingTop = "0.5rem"     # espaço abaixo da barra do topo (valor entre aspas)
-# font = "sans serif"     # "sans serif", "serif" ou "monospace"
+paddingTop = "1.5rem"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+baseRadius = "0.6rem"
+showSidebarBorder = true
 
 [theme.light]
-primaryColor = "#ff4b4b"            # cor de destaque (widgets, links)
-backgroundColor = "#ffffff"         # fundo da página
-secondaryBackgroundColor = "#f0f2f6"  # fundo da sidebar e de widgets
-textColor = "#31333f"               # cor do texto
-borderColor = "#d5dae5"
+primaryColor = "#5b3f8c"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f7f2f1"
+textColor = "#2d223a"
+borderColor = "#e9d4d0"
+chartCategoricalColors = ["#5b3f8c", "#d99a8c", "#8f7ab3", "#2d223a"]
 
 [theme.dark]
-primaryColor = "#ff4b4b"
-backgroundColor = "#0e1117"
-secondaryBackgroundColor = "#262730"
-textColor = "#fafafa"
-borderColor = "#41444e"
+primaryColor = "#b59ad9"
+backgroundColor = "#17121f"
+secondaryBackgroundColor = "#241c30"
+textColor = "#f1eaf0"
+borderColor = "#3a2f48"
+chartCategoricalColors = ["#b59ad9", "#e9b4a8", "#8f7ab3", "#f1eaf0"]
