@@ -1,4 +1,9 @@
-# Tema baseado na paleta da EDA (rosa = Normal, roxo = Cardíaco).
+# Identidade visual — baseada na paleta da EDA (rosa = Normal, roxo = Cardíaco).
+# 3 cores-base:
+#   roxo profundo #5b3f8c  → cor de destaque (primaryColor) e tema "cardíaco"
+#   roxo médio    #7f5fb8  → classe Cardíaco nos gráficos
+#   coral         #c4786a  → classe Normal nos gráficos
+# As duas cores de classe têm contraste ≥ 3:1 tanto no fundo claro quanto no escuro.
 # O modo claro/escuro pode ser trocado pelo menu ⋮ → Settings.
 
 [theme]
@@ -6,6 +11,7 @@ paddingTop = "1.5rem"
 font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
 baseRadius = "0.6rem"
 showSidebarBorder = true
+metricValueFontWeight = 600
 
 [theme.light]
 primaryColor = "#5b3f8c"
@@ -13,7 +19,7 @@ backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f7f2f1"
 textColor = "#2d223a"
 borderColor = "#e9d4d0"
-chartCategoricalColors = ["#5b3f8c", "#d99a8c", "#8f7ab3", "#2d223a"]
+chartCategoricalColors = ["#7f5fb8", "#c4786a", "#2d223a", "#b59ad9"]
 
 [theme.dark]
 primaryColor = "#b59ad9"
@@ -21,4 +27,4 @@ backgroundColor = "#17121f"
 secondaryBackgroundColor = "#241c30"
 textColor = "#f1eaf0"
 borderColor = "#3a2f48"
-chartCategoricalColors = ["#b59ad9", "#e9b4a8", "#8f7ab3", "#f1eaf0"]
+chartCategoricalColors = ["#7f5fb8", "#c4786a", "#f1eaf0", "#b59ad9"]

@@ -1,3 +1,4 @@
+import altair as alt
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -24,8 +25,8 @@ ROTULOS = {
     "Oldpeak": "Oldpeak (depressão ST)",
 }
 
-# Paleta da EDA: rosa para Normal, roxo para Cardíaco (tons ajustados para ler bem no modo claro e escuro)
-CORES_CLASSE = {"Normal": "#d99a8c", "Cardíaco": "#5b3f8c"}
+# Paleta da EDA: coral para Normal, roxo para Cardíaco (contraste ≥ 3:1 no modo claro e no escuro)
+CORES_CLASSE = {"Normal": "#c4786a", "Cardíaco": "#7f5fb8"}
 ORDEM_CLASSE = ["Normal", "Cardíaco"]
 
 # Sidebar: filtros
@@ -214,44 +215,49 @@ with aba_d1:
         st.plotly_chart(fig, alt=f"Dispersão de {ROTULOS[eixo_x]} por {ROTULOS[eixo_y]}")
 
 
-def taxa_doenca(dados, coluna, ordem=None):
-    """% de pacientes com diagnóstico positivo em cada categoria da coluna."""
-    taxa = (
-        dados.groupby(coluna, observed=True)["HeartDisease"]
-        .agg(pct="mean", n="size")
-        .reset_index()
-    )
-    taxa["pct"] = taxa["pct"] * 100
-    if ordem:
-        taxa[coluna] = pd.Categorical(taxa[coluna], categories=ordem, ordered=True)
-        taxa = taxa.sort_values(coluna)
-    return taxa
+def mediana(dados, var, classe=None):
+    if classe:
+        dados = dados[dados["doenca_cardiaca"] == classe]
+    return dados[var].median()
 
 
-def grafico_taxa(dados, coluna, titulo, descricao, ordem=None):
-    taxa = taxa_doenca(dados, coluna, ordem)
-    fig = px.bar(
-        taxa,
-        x=coluna,
-        y="pct",
-        text=taxa["pct"].map(lambda v: f"{v:.0f}%"),
-        hover_data={"n": True, "pct": ":.1f"},
-        color_discrete_sequence=[CORES_CLASSE["Cardíaco"]],
-        labels={"pct": "% com doença", coluna: "", "n": "Pacientes"},
+def grafico_taxa(dados, coluna, titulo, ordem, selecao, outras_selecoes):
+    """% com doença por categoria. O clique seleciona; os filtros vêm das seleções dos outros gráficos."""
+    base = alt.Chart(dados, title=titulo)
+    for outra in outras_selecoes:
+        base = base.transform_filter(outra)
+    base = base.transform_aggregate(pct="mean(HeartDisease)", n="count()", groupby=[coluna])
+    eixo_x = alt.X(f"{coluna}:N", sort=ordem, title=None, axis=alt.Axis(labelAngle=0))
+    barras = (
+        base.mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+        .encode(
+            x=eixo_x,
+            y=alt.Y("pct:Q", title="% com doença", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
+            color=alt.value(CORES_CLASSE["Cardíaco"]),
+            opacity=alt.condition(selecao, alt.value(1), alt.value(0.35)),
+            tooltip=[
+                alt.Tooltip(f"{coluna}:N", title="Categoria"),
+                alt.Tooltip("pct:Q", title="% com doença", format=".1%"),
+                alt.Tooltip("n:Q", title="Pacientes"),
+            ],
+        )
+        .add_params(selecao)
     )
-    fig.update_traces(textposition="outside", cliponaxis=False)
-    fig.update_layout(margin=dict(l=0, r=0, t=20, b=0), yaxis_range=[0, 105])
-    with st.container(border=True):
-        st.markdown(f"**{titulo}**")
-        st.caption(descricao)
-        st.plotly_chart(fig, alt=f"Percentual com doença cardíaca por {titulo.lower()}", height=280)
+    rotulos = base.mark_text(dy=-8, fontWeight=600).encode(
+        x=eixo_x, y="pct:Q", text=alt.Text("pct:Q", format=".0%")
+    )
+    return (barras + rotulos).properties(width=330, height=220)
 
 
 # Dashboard 2: KPIs
 with aba_d2:
-    pct_base = df["HeartDisease"].mean() * 100
-    pct_filtro = df_filtrado["HeartDisease"].mean() * 100
-    n_imputados = int(df_filtrado["Cholesterol_imputado"].sum())
+    prevalencia_base = df["HeartDisease"].mean() * 100
+    prevalencia = df_filtrado["HeartDisease"].mean() * 100
+    asy = df_filtrado[df_filtrado["ChestPainType"] == "ASY"]
+    prevalencia_asy = asy["HeartDisease"].mean() * 100 if len(asy) else np.nan
+    fc_cardiaco = mediana(df_filtrado, "MaxHR", "Cardíaco")
+    fc_normal = mediana(df_filtrado, "MaxHR", "Normal")
+    n_sem_colesterol = int(df_filtrado["Cholesterol_imputado"].sum())
 
     with st.container(horizontal=True):
         st.metric(
@@ -260,70 +266,123 @@ with aba_d2:
             len(df_filtrado) - len(df),
             delta_color="off",
             delta_description="vs. base completa",
+            help="Contagem de pacientes dentro dos filtros da sidebar.",
             border=True,
         )
         st.metric(
-            "Com doença cardíaca",
-            f"{pct_filtro:.1f}%",
-            f"{pct_filtro - pct_base:+.1f} p.p.",
+            "Prevalência de doença cardíaca",
+            f"{prevalencia:.1f}%",
+            round(prevalencia - prevalencia_base, 1) and f"{prevalencia - prevalencia_base:+.1f} p.p.",
             delta_color="inverse",
             delta_description="vs. base completa",
+            help="Proporção de pacientes com diagnóstico positivo (HeartDisease = 1).",
             border=True,
         )
         st.metric(
-            "Idade mediana",
-            f"{df_filtrado['Age'].median():.0f} anos",
-            f"{df_filtrado['Age'].median() - df['Age'].median():+.0f}",
+            "Doença entre assintomáticos",
+            "—" if np.isnan(prevalencia_asy) else f"{prevalencia_asy:.1f}%",
+            None if np.isnan(prevalencia_asy) else f"{prevalencia_asy - prevalencia:+.1f} p.p.",
+            delta_color="inverse",
+            delta_description="vs. prevalência geral",
+            help="% com doença entre os pacientes sem dor no peito característica (ChestPainType = ASY).",
+            border=True,
+        )
+        st.metric(
+            "FC máxima mediana dos cardíacos",
+            "—" if np.isnan(fc_cardiaco) else f"{fc_cardiaco:.0f} bpm",
+            None if np.isnan(fc_cardiaco) or np.isnan(fc_normal) else f"{fc_cardiaco - fc_normal:+.0f} bpm",
             delta_color="off",
-            delta_description="vs. base completa",
+            delta_description="vs. pacientes normais",
+            help="Mediana da frequência cardíaca máxima no esforço do grupo Cardíaco, comparada à do grupo Normal.",
             border=True,
         )
         st.metric(
-            "FC máxima mediana",
-            f"{df_filtrado['MaxHR'].median():.0f} bpm",
-            f"{df_filtrado['MaxHR'].median() - df['MaxHR'].median():+.0f}",
-            delta_color="off",
-            delta_description="vs. base completa",
-            border=True,
-        )
-        st.metric(
-            "Colesterol imputado",
-            f"{100 * n_imputados / len(df_filtrado):.1f}%",
-            f"{n_imputados} pacientes",
+            "Sem exame de colesterol",
+            f"{100 * n_sem_colesterol / len(df_filtrado):.1f}%",
+            f"{n_sem_colesterol} pacientes",
             delta_color="off",
             delta_description="imputados pela mediana",
+            help="Taxa de pacientes cujo colesterol veio como 0 (não medido) e foi imputado.",
             border=True,
-        )
-
-    linha1 = st.columns(2)
-    with linha1[0]:
-        grafico_taxa(
-            df_filtrado, "ST_Slope", "Inclinação do segmento ST",
-            "A variável qualitativa mais informativa da EDA (Qui² p ≈ 8 × 10⁻⁷⁸).",
-            ordem=["Up", "Flat", "Down"],
-        )
-    with linha1[1]:
-        grafico_taxa(
-            df_filtrado, "ChestPainType", "Tipo de dor no peito",
-            "ASY (assintomático) concentra mais doença: sem dor característica não significa sem doença.",
-            ordem=["ASY", "NAP", "ATA", "TA"],
-        )
-
-    linha2 = st.columns(2)
-    with linha2[0]:
-        grafico_taxa(
-            df_filtrado, "sexo_label", "Sexo",
-            "Diferença de quase 40 p.p. — pode ser risco real ou viés de encaminhamento.",
-        )
-    with linha2[1]:
-        grafico_taxa(
-            df_filtrado, "faixa_etaria", "Faixa etária",
-            "O risco cresce até os 64 anos e depois estabiliza.",
-            ordem=FAIXAS_ETARIAS,
         )
 
     with st.container(border=True):
-        st.markdown("**Normal × Cardíaco: medianas e teste de Mann-Whitney**")
+        st.subheader("Onde a doença se concentra")
+        st.caption(
+            "Clique numa barra para filtrar os outros gráficos (shift + clique seleciona várias; "
+            "clique fora das barras para limpar)."
+        )
+
+        dados_alt = df_filtrado[
+            ["HeartDisease", "doenca_cardiaca", "faixa_etaria", "ST_Slope", "ChestPainType", "sexo_label"]
+        ].astype({"faixa_etaria": str})
+
+        sel_faixa = alt.selection_point(fields=["faixa_etaria"], name="faixa")
+        sel_st = alt.selection_point(fields=["ST_Slope"], name="st")
+        sel_dor = alt.selection_point(fields=["ChestPainType"], name="dor")
+        sel_sexo = alt.selection_point(fields=["sexo_label"], name="sexo")
+        selecoes = [sel_faixa, sel_st, sel_dor, sel_sexo]
+
+        def outras(selecao):
+            return [s for s in selecoes if s is not selecao]
+
+        # Idade discretizada em faixas: contagem de pacientes por classe
+        base_faixa = alt.Chart(dados_alt, title="Pacientes por faixa etária")
+        for outra in outras(sel_faixa):
+            base_faixa = base_faixa.transform_filter(outra)
+        grafico_faixa = (
+            base_faixa.mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+            .encode(
+                x=alt.X("faixa_etaria:N", sort=FAIXAS_ETARIAS, title=None, axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("count():Q", title="Pacientes"),
+                color=alt.Color(
+                    "doenca_cardiaca:N",
+                    title="Classe",
+                    scale=alt.Scale(domain=ORDEM_CLASSE, range=[CORES_CLASSE[c] for c in ORDEM_CLASSE]),
+                    legend=alt.Legend(orient="top"),
+                ),
+                order=alt.Order("doenca_cardiaca:N", sort="descending"),
+                opacity=alt.condition(sel_faixa, alt.value(1), alt.value(0.35)),
+                tooltip=[
+                    alt.Tooltip("faixa_etaria:N", title="Faixa etária"),
+                    alt.Tooltip("doenca_cardiaca:N", title="Classe"),
+                    alt.Tooltip("count():Q", title="Pacientes"),
+                ],
+            )
+            .add_params(sel_faixa)
+            .properties(width=330, height=220)
+        )
+
+        painel = alt.vconcat(
+            alt.hconcat(
+                grafico_faixa,
+                grafico_taxa(dados_alt, "ST_Slope", "% com doença por inclinação do ST",
+                             ["Up", "Flat", "Down"], sel_st, outras(sel_st)),
+            ),
+            alt.hconcat(
+                grafico_taxa(dados_alt, "ChestPainType", "% com doença por tipo de dor no peito",
+                             ["ASY", "NAP", "ATA", "TA"], sel_dor, outras(sel_dor)),
+                grafico_taxa(dados_alt, "sexo_label", "% com doença por sexo",
+                             ["Feminino", "Masculino"], sel_sexo, outras(sel_sexo)),
+            ),
+        ).configure_title(anchor="start", fontSize=14)
+
+        st.altair_chart(
+            painel,
+            alt="Painel interligado: pacientes por faixa etária e % com doença por inclinação do ST, dor no peito e sexo",
+        )
+
+        with st.expander("Como ler", icon=":material/lightbulb:"):
+            st.markdown(
+                "- **ST plano (Flat) ou descendente (Down)** inverte o prognóstico em relação ao **Up**: "
+                "é a qualitativa mais associada ao desfecho na EDA (Qui² p ≈ 8 × 10⁻⁷⁸).\n"
+                "- **ASY** (assintomático) é a categoria com mais doença: sem dor característica não é sem doença.\n"
+                "- A diferença entre **sexos** (≈ 40 p.p.) pode ser risco real ou viés de encaminhamento.\n"
+                "- O risco cresce com a **idade** até os 64 anos e depois estabiliza."
+            )
+
+    with st.container(border=True):
+        st.subheader("Normal × Cardíaco: medianas e teste de Mann-Whitney")
         st.caption(
             "Nenhuma quantitativa é normal, então a comparação usa o teste não-paramétrico. "
             "Significância estatística não é o mesmo que relevância prática: olhe a diferença de mediana junto com o p-valor."
