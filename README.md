@@ -1,6 +1,6 @@
 # Heart Failure Prediction — EDA e dashboards em Streamlit
 
-**App publicado:** <!-- LINK_DO_APP --> _(link do Streamlit Community Cloud, adicionar após o deploy)_
+**App publicado:** https://avd-20262-pratica-app-b235nyikmprsypgrfhzqzj.streamlit.app/
 
 Projeto da disciplina **Análise e Visualização de Dados** (CESAR School, 2026.2), aulas 21 a 23. A partir da minha EDA do dataset *Heart Failure Prediction* (fedesoriano, Kaggle), construí dois dashboards interativos:
 
